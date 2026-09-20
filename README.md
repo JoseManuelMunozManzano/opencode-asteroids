@@ -44,3 +44,4 @@ Luego visita `http://localhost:3000`.
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
 - Power-up Velocidad: al destruir un asteroide hay 15% de probabilidad de que suelte un recogible (círculo con `>>`, dura 8 s). Al recogerlo, la nave duplica propulsión y velocidad actual durante 5 s; recoger otro reinicia el temporizador. El efecto se pierde al morir y el HUD muestra `VELOCIDAD x2` con el tiempo restante.
+- Power-up Escudo: al destruir un asteroide hay 10% de probabilidad independiente de que suelte un recogible (círculo con símbolo de escudo, dura 8 s). Al recogerlo, la nave queda protegida durante 10 s; los asteroides y estrellas fugaces que la toquen se destruyen con puntos, división y posibles power-ups normales, sin consumir el escudo. Recoger otro reinicia el temporizador. El escudo se pierde al morir o cambiar de nivel y el HUD muestra `ESCUDO` con el tiempo restante.
