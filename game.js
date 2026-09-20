@@ -179,6 +179,77 @@ class ShootingStar {
   }
 }
 
+// ── Skins de nave ─────────────────────────────────────────────────────────────
+const SHIP_SKINS = [
+  {
+    id: 'clasica',
+    name: 'CLÁSICA',
+    flameX: -8,
+    path() {
+      ctx.moveTo(20, 0);   // nariz
+      ctx.lineTo(-12, -9); // ala izquierda
+      ctx.lineTo(-7, 0);   // muesca trasera
+      ctx.lineTo(-12, 9);  // ala derecha
+      ctx.closePath();
+    },
+  },
+  {
+    id: 'interceptor',
+    name: 'INTERCEPTOR',
+    flameX: -10,
+    path() {
+      ctx.moveTo(22, 0);    // nariz afilada
+      ctx.lineTo(-6, -4);   // fuselaje
+      ctx.lineTo(-12, -12); // alerón izquierdo
+      ctx.lineTo(-8, 0);    // muesca trasera
+      ctx.lineTo(-12, 12);  // alerón derecho
+      ctx.lineTo(-6, 4);
+      ctx.closePath();
+    },
+  },
+  {
+    id: 'platillo',
+    name: 'PLATILLO',
+    flameX: -15,
+    path() {
+      ctx.moveTo(18, 0);   // proa
+      ctx.lineTo(6, -6);
+      ctx.lineTo(-8, -10); // casco superior
+      ctx.lineTo(-16, 0);  // popa
+      ctx.lineTo(-8, 10);  // casco inferior
+      ctx.lineTo(6, 6);
+      ctx.closePath();
+    },
+  },
+];
+
+const SKIN_STORAGE_KEY = 'asteroids-skin';
+
+function loadStoredSkinId() {
+  try {
+    const stored = localStorage.getItem(SKIN_STORAGE_KEY);
+    if (SHIP_SKINS.some(s => s.id === stored)) return stored;
+  } catch (_) { /* almacenamiento no disponible */ }
+  return SHIP_SKINS[0].id;
+}
+
+function getSkin() {
+  return SHIP_SKINS.find(s => s.id === currentSkinId) || SHIP_SKINS[0];
+}
+
+function setSkin(id) {
+  if (!SHIP_SKINS.some(s => s.id === id)) return;
+  currentSkinId = id;
+  try {
+    localStorage.setItem(SKIN_STORAGE_KEY, id);
+  } catch (_) { /* almacenamiento no disponible */ }
+}
+
+function cycleSkin() {
+  const i = SHIP_SKINS.findIndex(s => s.id === currentSkinId);
+  setSkin(SHIP_SKINS[(i + 1) % SHIP_SKINS.length].id);
+}
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
   constructor() { this.reset(); }
@@ -261,21 +332,18 @@ class Ship {
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
 
-    // Silueta clásica: triángulo con muesca trasera
+    // Silueta según skin activa (solo visual, sin tocar física ni hitbox)
+    const skin = getSkin();
     ctx.beginPath();
-    ctx.moveTo( 20,  0);   // nariz
-    ctx.lineTo(-12, -9);   // ala izquierda
-    ctx.lineTo( -7,  0);   // muesca trasera
-    ctx.lineTo(-12,  9);   // ala derecha
-    ctx.closePath();
+    skin.path();
     ctx.stroke();
 
     // Llama del propulsor
     if (this.thrusting && Math.random() > 0.35) {
       ctx.beginPath();
-      ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
-      ctx.lineTo(-8,  4);
+      ctx.moveTo(skin.flameX, -4);
+      ctx.lineTo(skin.flameX - rand(6, 14), 0);
+      ctx.lineTo(skin.flameX,  4);
       ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
       ctx.stroke();
     }
@@ -361,6 +429,7 @@ let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
 let shootingStarTimer;
+let currentSkinId = loadStoredSkinId();
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -434,6 +503,9 @@ function killShip() {
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  // Cambio de skin disponible en cualquier estado (playing | dead | gameover)
+  if (pressed('KeyC')) cycleSkin();
+
   if (state === 'gameover') {
     if (pressed('Space')) initGame();
     particles.forEach(p => p.update(dt));
@@ -545,15 +617,12 @@ function drawLifeIcon(x, y) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
+  ctx.scale(0.45, 0.45);
   ctx.strokeStyle = '#fff';
-  ctx.lineWidth   = 1.2;
+  ctx.lineWidth   = 2.5;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
-  ctx.moveTo( 9,  0);
-  ctx.lineTo(-6, -5);
-  ctx.lineTo(-3,  0);
-  ctx.lineTo(-6,  5);
-  ctx.closePath();
+  getSkin().path();
   ctx.stroke();
   ctx.restore();
 }
@@ -573,6 +642,9 @@ function drawHUD() {
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillText(`SKIN ${getSkin().name}  [C]`, 14, H - 14);
 }
 
 function drawOverlay(title, sub) {
