@@ -118,6 +118,67 @@ class Asteroid {
   }
 }
 
+// ── Estrella fugaz ──────────────────────────────────────────────────────────
+const SHOOTING_STAR_POINTS = 250;
+const SHOOTING_STAR_TTL = 4;
+const SHOOTING_STAR_SPEED = 300;
+
+class ShootingStar {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 14;
+    this.life = SHOOTING_STAR_TTL;
+    this.ttl = this.life;
+    this.dead = false;
+
+    const angle = rand(0, Math.PI * 2);
+    const speed = SHOOTING_STAR_SPEED + rand(-30, 40);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+  }
+
+  update(dt) {
+    this.x = wrap(this.x + this.vx * dt, W);
+    this.y = wrap(this.y + this.vy * dt, H);
+    this.ttl -= dt;
+    if (this.ttl <= 0) this.dead = true;
+  }
+
+  draw() {
+    const alpha = Math.max(this.ttl / this.life, 0);
+    const mag = Math.hypot(this.vx, this.vy) || 1;
+    const nx = this.vx / mag;
+    const ny = this.vy / mag;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    // Cola luminosa opuesta a velocidad, con desvanecido por ttl
+    for (let i = 3; i >= 1; i--) {
+      const t0 = i * 14;
+      const t1 = (i + 1) * 14;
+      ctx.strokeStyle = `rgba(255,255,255,${(alpha * (4 - i) / 3 * 0.8).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.moveTo(-nx * t0, -ny * t0);
+      ctx.lineTo(-nx * t1, -ny * t1);
+      ctx.stroke();
+    }
+    // Cabeza
+    ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Anillo distintivo
+    ctx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
   constructor() { this.reset(); }
@@ -295,10 +356,11 @@ class SpeedPowerUp {
 }
 
 // ── Estado del juego ──────────────────────────────────────────────────────────
-let ship, bullets, asteroids, particles, powerUps;
+let ship, bullets, asteroids, particles, powerUps, shootingStars;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
+let shootingStarTimer;
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -312,16 +374,34 @@ function spawnAsteroids(count) {
   }
 }
 
+function spawnShootingStar() {
+  const SAFE_DIST = 150;
+  let x, y;
+  let guard = 0;
+  do {
+    x = rand(0, W);
+    y = rand(0, H);
+    guard++;
+  } while (guard < 20 && ship && !ship.dead && Math.hypot(x - ship.x, y - ship.y) < SAFE_DIST);
+  shootingStars.push(new ShootingStar(x, y));
+}
+
+function resetShootingStarTimer(first = false) {
+  shootingStarTimer = first ? rand(3, 6) : rand(10, 18);
+}
+
 function initGame() {
   ship          = new Ship();
   bullets   = [];
   asteroids = [];
   particles = [];
   powerUps  = [];
+  shootingStars = [];
   score  = 0;
   lives  = 3;
   level  = 1;
   state  = 'playing';
+  resetShootingStarTimer(true);
   spawnAsteroids(4);
 }
 
@@ -330,7 +410,9 @@ function nextLevel() {
   bullets   = [];
   particles = [];
   powerUps  = [];
+  shootingStars = [];
   ship.reset();
+  resetShootingStarTimer(true);
   spawnAsteroids(3 + level);
 }
 
@@ -364,6 +446,8 @@ function update(dt) {
     particles.forEach(p => p.update(dt));
     particles = particles.filter(p => !p.dead);
     asteroids.forEach(a => a.update(dt));
+    shootingStars.forEach(s => s.update(dt));
+    shootingStars = shootingStars.filter(s => !s.dead);
     powerUps.forEach(p => p.update(dt));
     powerUps = powerUps.filter(p => !p.dead);
     if (deadTimer <= 0) { state = 'playing'; ship.reset(); }
@@ -375,15 +459,24 @@ function update(dt) {
     bullets.push(...ship.tryShoot());
   }
 
+  // Aparición ocasional de estrella fugaz (temporizador basado en dt)
+  shootingStarTimer -= dt;
+  if (shootingStarTimer <= 0) {
+    spawnShootingStar();
+    resetShootingStarTimer(false);
+  }
+
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
   asteroids.forEach(a => a.update(dt));
+  shootingStars.forEach(s => s.update(dt));
   particles.forEach(p => p.update(dt));
   powerUps.forEach(p => p.update(dt));
 
   bullets   = bullets.filter(b => !b.dead);
   particles = particles.filter(p => !p.dead);
   powerUps  = powerUps.filter(p => !p.dead);
+  shootingStars = shootingStars.filter(s => !s.dead);
 
   // Bala vs asteroide
   const newAsteroids = [];
@@ -402,6 +495,20 @@ function update(dt) {
   asteroids = asteroids.filter(a => !a.dead).concat(newAsteroids);
   bullets   = bullets.filter(b => !b.dead);
 
+  // Bala vs estrella fugaz (bonus, no se divide ni suelta power-up)
+  for (const b of bullets) {
+    for (const s of shootingStars) {
+      if (!s.dead && !b.dead && dist(b, s) < s.radius) {
+        b.dead = true;
+        s.dead = true;
+        score += SHOOTING_STAR_POINTS;
+        explode(s.x, s.y, 10);
+      }
+    }
+  }
+  shootingStars = shootingStars.filter(s => !s.dead);
+  bullets = bullets.filter(b => !b.dead);
+
   // Nave vs power-up
   for (const p of powerUps) {
     if (!p.dead && !ship.dead && dist(ship, p) < ship.radius + p.radius) {
@@ -412,7 +519,7 @@ function update(dt) {
   }
   powerUps = powerUps.filter(p => !p.dead);
 
-  // Nave vs asteroide
+  // Nave vs asteroide / estrella fugaz
   if (ship.invincible <= 0) {
     for (const a of asteroids) {
       if (dist(ship, a) < ship.radius + a.radius * 0.82) {
@@ -420,9 +527,16 @@ function update(dt) {
         break;
       }
     }
+    if (ship.dead) return;
+    for (const s of shootingStars) {
+      if (!s.dead && dist(ship, s) < ship.radius + s.radius * 0.82) {
+        killShip();
+        break;
+      }
+    }
   }
 
-  // Nivel completado
+  // Nivel completado (estrellas fugaces no bloquean avance)
   if (asteroids.length === 0) nextLevel();
 }
 
@@ -477,6 +591,7 @@ function draw() {
 
   particles.forEach(p => p.draw());
   asteroids.forEach(a => a.draw());
+  shootingStars.forEach(s => s.draw());
   powerUps.forEach(p => p.draw());
   bullets.forEach(b => b.draw());
   ship.draw();
