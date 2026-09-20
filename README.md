@@ -43,3 +43,4 @@ Luego visita `http://localhost:3000`.
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
+- Power-up Velocidad: al destruir un asteroide hay 15% de probabilidad de que suelte un recogible (círculo con `>>`, dura 8 s). Al recogerlo, la nave duplica propulsión y velocidad actual durante 5 s; recoger otro reinicia el temporizador. El efecto se pierde al morir y el HUD muestra `VELOCIDAD x2` con el tiempo restante.
